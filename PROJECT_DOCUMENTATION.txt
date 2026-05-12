@@ -1,0 +1,652 @@
+================================================================================
+                        CAFEPOS - PROJECT DOCUMENTATION
+================================================================================
+Version : 2.0.0
+Stack   : FastAPI (Python) + React (Vite) + MongoDB
+Name    : CaféPOS — Point of Sale System for Cafés/Restaurants
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+1.  Project Overview
+2.  Tech Stack & Dependencies
+3.  Project Structure
+4.  Environment Setup
+5.  Running the Project
+6.  Backend Architecture
+7.  Database Models
+8.  API Endpoints Reference
+9.  WebSocket
+10. Frontend Architecture
+11. Pages & Routes
+12. State Management (Context)
+13. Services (API & Socket)
+14. Utility Functions
+15. UI / Design System
+16. User Roles & Access Control
+17. Order Lifecycle
+18. Payment Flow
+19. QR Code Self-Ordering
+20. Customer Display Screen
+21. Seeding the Database
+
+================================================================================
+1. PROJECT OVERVIEW
+================================================================================
+CaféPOS is a full-stack Point of Sale system designed for cafés and restaurants.
+It supports:
+  - Admin dashboard with analytics, product/table/staff management
+  - Staff order-taking interface with cart and payment processing
+  - Customer self-ordering via QR code scan (no login required)
+  - Real-time kitchen display and customer order status screen
+  - WebSocket-based live updates across all connected clients
+
+================================================================================
+2. TECH STACK & DEPENDENCIES
+================================================================================
+
+BACKEND
+-------
+Language    : Python 3.11+
+Framework   : FastAPI 0.111.0
+Server      : Uvicorn 0.29.0 (with standard extras)
+Database    : MongoDB (via Motor 3.4.0 async driver + PyMongo 4.7.2)
+Auth        : JWT (python-jose 3.3.0) + bcrypt password hashing (passlib 1.7.4)
+Validation  : Pydantic v2 (pydantic-settings 2.3.0)
+WebSockets  : websockets 12.0
+Other       : python-dotenv 1.0.1, python-multipart 0.0.9
+
+FRONTEND
+--------
+Language    : JavaScript (JSX)
+Framework   : React 18.3.1
+Build Tool  : Vite 5.2.13
+Routing     : React Router DOM 6.23.1
+HTTP Client : Axios 1.7.2
+Styling     : Tailwind CSS 3.4.4
+Animation   : Framer Motion 12.38.0
+Icons       : Lucide React 0.395.0
+Charts      : Recharts 2.12.7
+QR Codes    : qrcode.react 4.2.0
+Toasts      : react-hot-toast 2.6.0
+Counters    : react-countup 6.5.3
+
+================================================================================
+3. PROJECT STRUCTURE
+================================================================================
+
+POS/
+├── backend/
+│   ├── app/
+│   │   ├── core/
+│   │   │   ├── config.py          # Pydantic settings (reads .env)
+│   │   │   ├── database.py        # MongoDB Motor client connect/close
+│   │   │   └── utils.py           # doc() and to_oid() helpers
+│   │   ├── models/
+│   │   │   ├── user.py            # UserRole enum (admin, staff)
+│   │   │   ├── table.py           # TableStatus enum (available, occupied)
+│   │   │   └── order.py           # OrderStatus, PaymentStatus, PaymentMethod enums
+│   │   ├── routes/
+│   │   │   ├── auth.py            # /auth — register, login, promote
+│   │   │   ├── tables.py          # /tables — CRUD
+│   │   │   ├── products.py        # /products — CRUD
+│   │   │   ├── orders.py          # /orders — CRUD + status update
+│   │   │   ├── kitchen.py         # /kitchen — preparing orders + dashboard
+│   │   │   ├── analytics.py       # /analytics — overview, daily revenue, top products, staff
+│   │   │   └── public.py          # /public — unauthenticated table menu + self-order
+│   │   ├── schemas/
+│   │   │   ├── user.py            # UserCreate, UserOut, Token, LoginRequest, PromoteRequest
+│   │   │   ├── table.py           # TableCreate, TableUpdate, TableOut
+│   │   │   ├── product.py         # ProductCreate, ProductUpdate, ProductOut
+│   │   │   ├── order.py           # OrderCreate, OrderStatusUpdate, OrderOut
+│   │   │   └── order_item.py      # OrderItemCreate, OrderItemOut
+│   │   ├── services/
+│   │   │   └── order_service.py   # create_order_with_items() business logic
+│   │   ├── websockets/
+│   │   │   └── manager.py         # ConnectionManager — broadcast to all WS clients
+│   │   └── main.py                # FastAPI app, CORS, router registration, WS endpoint
+│   ├── .env                       # Environment variables (not committed)
+│   ├── requirements.txt
+│   ├── seed.py                    # Seeds sample products and orders
+│   └── seed_admin.py              # Creates the first admin user
+│
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── admin/
+│   │   │   │   ├── AdminLayout.jsx    # Sidebar + Navbar wrapper for admin pages
+│   │   │   │   ├── AdminNavbar.jsx    # Top bar with user info and logout
+│   │   │   │   └── AdminSidebar.jsx   # Left nav with links to admin sections
+│   │   │   ├── common/
+│   │   │   │   ├── Button.jsx         # Reusable button with variants and loading state
+│   │   │   │   ├── Modal.jsx          # Centered modal overlay
+│   │   │   │   └── Skeleton.jsx       # Loading skeleton placeholder
+│   │   │   └── staff/
+│   │   │       └── StaffLayout.jsx    # Top nav wrapper for staff pages
+│   │   ├── context/
+│   │   │   ├── AuthContext.jsx        # User auth state, login(), logout()
+│   │   │   └── OrderContext.jsx       # Cart state, selectedTable, cart helpers
+│   │   ├── pages/
+│   │   │   ├── admin/
+│   │   │   │   ├── AdminDashboard.jsx # Stats, revenue chart, recent orders, top products
+│   │   │   │   ├── AdminTables.jsx    # Table grid with QR, add/edit/delete
+│   │   │   │   ├── AdminProducts.jsx  # Product grid with search, filter, CRUD
+│   │   │   │   ├── AdminOrders.jsx    # Order list with filter and search
+│   │   │   │   ├── AdminAnalytics.jsx # Charts: revenue, orders, top products, pie
+│   │   │   │   └── AdminStaff.jsx     # User list with role management
+│   │   │   ├── staff/
+│   │   │   │   ├── StaffDashboard.jsx # Table selection grid with live WS updates
+│   │   │   │   ├── StaffOrder.jsx     # Product menu + cart + payment keypad modal
+│   │   │   │   └── StaffPaymentHistory.jsx # Completed orders with revenue summary
+│   │   │   ├── Login.jsx              # Login form with role info
+│   │   │   ├── Signup.jsx             # Registration form (creates staff account)
+│   │   │   ├── TableMenu.jsx          # Customer self-order page (QR scan target)
+│   │   │   ├── CustomerDisplay.jsx    # TV display: preparing + ready columns
+│   │   │   └── StaffDisplay.jsx       # Staff-facing order display
+│   │   ├── services/
+│   │   │   ├── api.js                 # Axios instance with auth interceptor
+│   │   │   └── socket.js             # WebSocket client with auto-reconnect
+│   │   ├── utils/
+│   │   │   ├── helpers.js             # formatCurrency, formatTime, statusColor
+│   │   │   ├── toast.js               # notify.success / notify.error wrappers
+│   │   │   └── upi.js                 # UPI deep-link generator + UPI_ID constant
+│   │   ├── App.jsx                    # Router, guards, providers
+│   │   ├── index.css                  # Tailwind base + custom component classes
+│   │   └── main.jsx                   # React DOM entry point
+│   ├── index.html
+│   ├── package.json
+│   ├── tailwind.config.js
+│   ├── postcss.config.js
+│   └── vite.config.js
+│
+├── start-backend.bat              # One-click backend start script
+├── start-frontend.bat             # One-click frontend start script
+└── .gitignore
+
+================================================================================
+4. ENVIRONMENT SETUP
+================================================================================
+
+Backend .env file (backend/.env):
+----------------------------------
+MONGO_URL=mongodb://localhost:27017
+MONGO_DB=pos_cafe
+SECRET_KEY=your-secret-key-here
+ACCESS_TOKEN_EXPIRE_MINUTES=480
+
+  - MONGO_URL     : MongoDB connection string (local or Atlas)
+  - MONGO_DB      : Database name
+  - SECRET_KEY    : Random secret for JWT signing (use a long random string)
+  - ACCESS_TOKEN_EXPIRE_MINUTES : Token validity (default 480 = 8 hours)
+
+Frontend API base URL (frontend/src/services/api.js):
+------------------------------------------------------
+  baseURL: 'http://localhost:8000'
+  (Change this if backend runs on a different host/port)
+
+Frontend WebSocket URL (frontend/src/services/socket.js):
+----------------------------------------------------------
+  WS_URL: 'ws://localhost:8000/ws/orders'
+
+UPI ID (frontend/src/utils/upi.js):
+------------------------------------
+  UPI_ID: Set your UPI ID here for payment QR generation
+
+================================================================================
+5. RUNNING THE PROJECT
+================================================================================
+
+Prerequisites:
+  - Python 3.11+
+  - Node.js 18+
+  - MongoDB running locally (or Atlas URI in .env)
+
+Backend:
+  cd backend
+  pip install -r requirements.txt
+  uvicorn app.main:app --reload --port 8000
+
+  OR double-click: start-backend.bat
+
+Frontend:
+  cd frontend
+  npm install
+  npm run dev
+
+  OR double-click: start-frontend.bat
+
+Seed initial data:
+  cd backend
+  python seed_admin.py    # Creates admin user
+  python seed.py          # Adds sample products and orders
+
+Access:
+  Frontend  : http://localhost:5173
+  Backend   : http://localhost:8000
+  API Docs  : http://localhost:8000/docs  (Swagger UI auto-generated)
+
+================================================================================
+6. BACKEND ARCHITECTURE
+================================================================================
+
+Entry Point: backend/app/main.py
+  - Creates FastAPI app with lifespan (connect/close MongoDB on startup/shutdown)
+  - Adds CORS middleware (allow_origins=["*"] — restrict in production)
+  - Registers all routers
+  - Defines /ws/orders WebSocket endpoint
+  - Health check GET / endpoint
+
+Request Flow:
+  HTTP Request → Router → Dependency (auth check) → Handler → Service/DB → Response
+
+Authentication:
+  - JWT Bearer token in Authorization header
+  - get_current_user() dependency decodes token and fetches user from DB
+  - require_admin() dependency extends get_current_user() with role check
+  - Tokens expire after ACCESS_TOKEN_EXPIRE_MINUTES (default 8 hours)
+
+Database Access:
+  - get_database() returns the Motor async database instance
+  - All DB operations are async (await db.collection.find_one(...))
+  - MongoDB _id is converted to string "id" via doc() helper
+
+================================================================================
+7. DATABASE MODELS
+================================================================================
+
+Collection: users
+  _id           : ObjectId
+  name          : str
+  username      : str (unique)
+  hashed_password: str
+  role          : "admin" | "staff"
+  is_active     : bool
+
+Collection: tables
+  _id           : ObjectId
+  number        : int (unique)
+  capacity      : int (default 4)
+  status        : "available" | "occupied"
+
+Collection: products
+  _id           : ObjectId
+  name          : str
+  category      : str (Coffee/Tea/Food/Snacks/Dessert/Drinks)
+  price         : float
+  is_available  : bool
+  image_url     : str | null
+
+Collection: orders
+  _id           : ObjectId
+  table_id      : str (ObjectId as string)
+  staff_id      : str (ObjectId as string, or "self-order" for QR orders)
+  status        : "preparing" | "completed"
+  payment_status: "paid"
+  payment_method: "cash" | "upi"
+  total_amount  : float
+  created_at    : datetime (UTC)
+  items         : [
+    {
+      product_id   : str
+      product_name : str
+      quantity     : int
+      unit_price   : float
+    }
+  ]
+
+================================================================================
+8. API ENDPOINTS REFERENCE
+================================================================================
+
+AUTH  (/auth)
+-------------
+POST /auth/register
+  Body: { name, username, password }
+  Returns: UserOut
+  Note: Always creates a staff account (public endpoint)
+
+POST /auth/login
+  Body: { username, password }
+  Returns: { access_token, token_type, user: UserOut }
+
+POST /auth/promote
+  Auth: Admin required
+  Body: { user_id, role: "admin"|"staff" }
+  Returns: UserOut
+  Note: Cannot change your own role
+
+TABLES  (/tables)  — Auth required
+------------------------------------
+GET    /tables/              → List[TableOut] (sorted by number)
+POST   /tables/              → TableOut  Body: { number, capacity }
+PATCH  /tables/{table_id}    → TableOut  Body: { status }
+DELETE /tables/{table_id}    → { message }
+
+PRODUCTS  (/products)  — Auth required
+---------------------------------------
+GET    /products/            → List[ProductOut]
+POST   /products/            → ProductOut  Body: { name, category, price, is_available, image_url? }
+PATCH  /products/{id}        → ProductOut  Body: partial ProductUpdate
+DELETE /products/{id}        → { message }
+
+ORDERS  (/orders)  — Auth required
+------------------------------------
+GET    /orders/              → List[OrderOut] (sorted by created_at desc)
+GET    /orders/{order_id}    → OrderOut
+POST   /orders/              → OrderOut  Body: { table_id, items: [{product_id, quantity}], payment_method }
+                               Side effects: marks table occupied, broadcasts NEW_ORDER via WS
+PATCH  /orders/{id}/status   → OrderOut  Body: { status }
+                               Side effects: if completed and no more preparing orders → marks table available
+                               Broadcasts UPDATE_ORDER via WS
+
+KITCHEN  (/kitchen)  — Auth required
+--------------------------------------
+GET /kitchen/orders          → List[OrderOut] (status=preparing, sorted oldest first)
+GET /kitchen/dashboard       → { total_orders, total_revenue, preparing, completed }
+
+ANALYTICS  (/analytics)  — Auth required
+-----------------------------------------
+GET /analytics/overview      → { total_orders, total_revenue, total_tables, occupied_tables,
+                                  total_products, pending, preparing, completed }
+GET /analytics/daily-revenue → [ { date, revenue, orders } ] (last 7 days)
+GET /analytics/top-products  → [ { name, quantity, revenue } ] (top 6 by quantity sold)
+GET /analytics/staff         → List[UserOut] (all users, no passwords)
+
+PUBLIC  (/public)  — No auth required
+---------------------------------------
+GET  /public/table/{table_id}  → TableOut
+GET  /public/products          → List[ProductOut] (is_available=True only)
+POST /public/orders            → OrderOut
+     Body: { table_id, items: [{product_id, quantity}], payment_method, customer_name? }
+     Side effects: marks table occupied, broadcasts NEW_ORDER via WS
+
+HEALTH
+------
+GET /  → { message: "POS Cafe API v2.0 is running" }
+
+================================================================================
+9. WEBSOCKET
+================================================================================
+
+Endpoint: ws://localhost:8000/ws/orders
+
+Message Format (JSON):
+  { "type": "NEW_ORDER" | "UPDATE_ORDER", "data": <OrderOut as dict> }
+
+Events:
+  NEW_ORDER    — Fired when any order is created (staff or customer self-order)
+  UPDATE_ORDER — Fired when an order's status is changed
+
+ConnectionManager (backend/app/websockets/manager.py):
+  - Maintains a list of active WebSocket connections
+  - broadcast() sends to all connections, removes dead ones automatically
+  - Singleton instance: manager
+
+Frontend Socket Client (frontend/src/services/socket.js):
+  - OrderSocket class with connect(), subscribe(fn), disconnect()
+  - Auto-reconnects every 3 seconds on disconnect
+  - subscribe() returns an unsubscribe function
+  - Used by: StaffDashboard, StaffPaymentHistory, CustomerDisplay
+
+================================================================================
+10. FRONTEND ARCHITECTURE
+================================================================================
+
+Entry: frontend/src/main.jsx → renders <App />
+
+App.jsx structure:
+  BrowserRouter
+  └── AuthProvider
+      └── OrderProvider
+          └── Toaster (react-hot-toast)
+          └── Routes
+              ├── Public routes (login, signup, display screens, table menu)
+              ├── AdminGuard → AdminLayout → Admin pages
+              └── StaffGuard → StaffLayout → Staff pages
+
+Route Guards:
+  RoleRouter  — redirects authenticated users to their role's home
+  AdminGuard  — requires login + admin role, wraps in AdminLayout
+  StaffGuard  — requires login + non-admin role, wraps in StaffLayout
+
+================================================================================
+11. PAGES & ROUTES
+================================================================================
+
+PUBLIC (no auth)
+  /login                  → Login.jsx
+  /signup                 → Signup.jsx
+  /menu/:tableId          → TableMenu.jsx  (QR scan target for customers)
+  /display/customer       → CustomerDisplay.jsx  (TV screen)
+  /display/staff          → StaffDisplay.jsx
+
+ADMIN (role=admin required)
+  /admin/dashboard        → AdminDashboard.jsx
+  /admin/tables           → AdminTables.jsx
+  /admin/products         → AdminProducts.jsx
+  /admin/orders           → AdminOrders.jsx
+  /admin/analytics        → AdminAnalytics.jsx
+  /admin/staff            → AdminStaff.jsx
+
+STAFF (role=staff required)
+  /staff/tables           → StaffDashboard.jsx
+  /staff/order            → StaffOrder.jsx
+  /staff/payments         → StaffPaymentHistory.jsx
+
+================================================================================
+12. STATE MANAGEMENT (CONTEXT)
+================================================================================
+
+AuthContext (frontend/src/context/AuthContext.jsx)
+  State   : user (from localStorage on init)
+  Methods :
+    login(username, password)  → calls POST /auth/login, stores token+user in localStorage
+    logout()                   → clears localStorage, sets user to null
+  Hook    : useAuth()
+
+OrderContext (frontend/src/context/OrderContext.jsx)
+  State   :
+    cart           : Array of { ...product, quantity }
+    selectedTable  : Table object or null
+  Methods :
+    addToCart(product)
+    removeFromCart(productId)
+    updateQuantity(productId, quantity)  — removes if quantity <= 0
+    clearCart()                          — resets cart and selectedTable
+    cartTotal                            — computed total price
+  Hook    : useOrder()
+
+================================================================================
+13. SERVICES (API & SOCKET)
+================================================================================
+
+api.js (Axios instance)
+  baseURL: http://localhost:8000
+  Request interceptor: attaches Bearer token from localStorage
+  Response interceptor: on 401 → clears localStorage and redirects to /login
+
+socket.js (WebSocket client)
+  connect()       — opens WS connection (skips if already open)
+  subscribe(fn)   — registers a message handler, returns unsubscribe fn
+  disconnect()    — closes connection and disables auto-reconnect
+  Auto-reconnect  — 3 second delay on close (if shouldReconnect=true)
+
+================================================================================
+14. UTILITY FUNCTIONS
+================================================================================
+
+helpers.js
+  formatCurrency(amount)  → "₹1,234.00" (en-IN locale, INR)
+  formatTime(dateStr)     → "02:30 PM" (en-IN locale)
+  statusColor             → object mapping status strings to Tailwind badge classes
+    { preparing, completed, available, occupied }
+
+toast.js
+  notify.success(msg)  → react-hot-toast success
+  notify.error(msg)    → react-hot-toast error
+
+upi.js
+  UPI_ID               → Your UPI ID string (configure here)
+  upiLink(amount, note) → UPI deep-link URL for QR code generation
+    Format: upi://pay?pa=<UPI_ID>&pn=CaféPOS&am=<amount>&cu=INR&tn=<note>
+
+backend/app/core/utils.py
+  doc(d)       → converts MongoDB _id to string "id" field
+  to_oid(str)  → converts string to ObjectId (returns None on failure)
+
+================================================================================
+15. UI / DESIGN SYSTEM
+================================================================================
+
+Theme: Dark mode only
+Primary color: brand orange (#f97316)
+
+Tailwind custom colors (tailwind.config.js):
+  brand.DEFAULT  : #f97316
+  brand.dark     : #ea580c
+  brand.light    : #fb923c
+  surface        : #0f1117  (page background)
+  surface.1      : #161b27  (card background)
+  surface.2      : #1c2333  (input/secondary background)
+  surface.3      : #232d42  (hover states)
+  surface.border : #2a3347  (borders)
+
+Custom CSS classes (index.css):
+  .input-field    → styled text input
+  .btn-primary    → orange gradient button
+  .btn-ghost      → transparent button with hover
+  .glass-card     → frosted glass card with border
+  .badge          → small status pill
+
+Custom shadows:
+  shadow-glow-brand, shadow-glow-sm, shadow-card, shadow-card-hover
+
+Custom animations:
+  fade-in, slide-up, slide-in-right, pulse-slow, bounce-sm
+
+Font: Inter (system fallback)
+
+================================================================================
+16. USER ROLES & ACCESS CONTROL
+================================================================================
+
+ADMIN
+  - Full access to all admin pages
+  - Can manage tables, products, orders, staff
+  - Can promote/demote staff roles (cannot change own role)
+  - Can view analytics and revenue data
+  - Created via seed_admin.py or promoted by another admin
+
+STAFF
+  - Access to staff pages only
+  - Can view tables and their status
+  - Can create orders for tables
+  - Can view payment history
+  - Cannot access admin dashboard or analytics
+  - Created via /auth/register (public) or by admin
+
+CUSTOMER (unauthenticated)
+  - Can access /menu/:tableId via QR code scan
+  - Can browse available products
+  - Can place orders directly (via /public/orders)
+  - No login required
+
+================================================================================
+17. ORDER LIFECYCLE
+================================================================================
+
+1. ORDER CREATION
+   Staff: POST /orders/ with table_id, items, payment_method
+   Customer: POST /public/orders with same fields
+   → Order created with status="preparing", payment_status="paid"
+   → Table status set to "occupied"
+   → NEW_ORDER broadcast via WebSocket
+
+2. KITCHEN PROCESSING
+   Kitchen display (CustomerDisplay.jsx) shows all "preparing" orders
+   Staff/kitchen marks order complete via PATCH /orders/{id}/status { status: "completed" }
+   → UPDATE_ORDER broadcast via WebSocket
+   → If no more "preparing" orders for that table → table set to "available"
+
+3. COMPLETION
+   Order moves to "completed" column on customer display
+   Removed from display after 45 seconds (COMPLETED_REMOVE_DELAY)
+   Appears in StaffPaymentHistory
+
+================================================================================
+18. PAYMENT FLOW
+================================================================================
+
+CASH PAYMENT (Staff)
+  1. Staff opens KeypadModal from StaffOrder
+  2. Selects "Cash" payment method
+  3. Enters cash received amount via numpad
+  4. System shows change to give back
+  5. Quick-amount buttons for common denominations
+  6. Confirm → POST /orders/ with payment_method="cash"
+
+UPI PAYMENT (Staff)
+  1. Staff selects "UPI" in KeypadModal
+  2. QR code generated using upiLink() with order total
+  3. Customer scans with any UPI app (GPay, PhonePe, Paytm)
+  4. Staff confirms payment received → POST /orders/ with payment_method="upi"
+
+CUSTOMER SELF-ORDER PAYMENT
+  1. Customer selects Cash or UPI in cart drawer
+  2. UPI: QR code shown for customer to scan
+  3. Cash: Customer pays at counter
+  4. Confirm → POST /public/orders
+
+================================================================================
+19. QR CODE SELF-ORDERING
+================================================================================
+
+Setup:
+  1. Admin goes to /admin/tables
+  2. Hovers over a table card → clicks QR icon
+  3. QR modal shows QR code for URL: http://<origin>/menu/<table_id>
+  4. Print or display QR code at the physical table
+
+Customer Flow:
+  1. Customer scans QR code with phone camera
+  2. Opens TableMenu.jsx at /menu/:tableId
+  3. Fetches table info from GET /public/table/:tableId
+  4. Fetches menu from GET /public/products
+  5. Browses menu, adds items to local cart
+  6. Opens cart drawer, selects payment method
+  7. Places order via POST /public/orders
+  8. Success screen shown with order number
+  9. Can tap "Order More" to place another order
+
+================================================================================
+20. CUSTOMER DISPLAY SCREEN
+================================================================================
+
+URL: /display/customer  (meant for a TV/monitor in the café)
+
+Features:
+  - Two-column layout: "Being Prepared" (blue) | "Ready to Collect" (green)
+  - Live clock in header
+  - WebSocket connection indicator (Live / Reconnecting)
+  - Real-time updates via WebSocket (NEW_ORDER, UPDATE_ORDER events)
+  - Flash animation when an order changes status
+  - Completed orders auto-removed after 45 seconds
+  - Shows up to 16 orders total
+  - No authentication required (public page)
+
+================================================================================
+21. SEEDING THE DATABASE
+================================================================================
+
+seed_admin.py
+  Creates an admin user. Edit the file to set username/password before running.
+  Command: python seed_admin.py
+
+seed.py
+  Inserts sample products across all categories (Coffee, Tea, Food, etc.)
+  Inserts sample completed orders for analytics demo data
+  Command: python seed.py
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================

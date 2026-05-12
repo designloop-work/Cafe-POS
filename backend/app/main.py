@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.database import connect_db, close_db
+from app.core.config import settings
 from app.routes import auth, tables, products, orders, kitchen, analytics
 from app.routes.public import router as public_router
 from app.websockets.manager import manager
@@ -16,7 +17,7 @@ app = FastAPI(title="POS Cafe API", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.allowed_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
