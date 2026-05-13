@@ -17,12 +17,22 @@ const strengthLabel = ['', 'Weak', 'Fair', 'Good', 'Strong', 'Very Strong']
 const strengthColor = ['', 'bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-green-500', 'bg-emerald-500']
 const strengthText  = ['', 'text-red-400', 'text-orange-400', 'text-yellow-400', 'text-green-400', 'text-emerald-400']
 
+const LABELS = {
+  fullName: 'Full Name',
+  username: 'Username',
+  password: 'Password',
+  adminSecretKey: 'Admin Secret Key',
+}
+
 export default function Signup() {
-  const [form, setForm] = useState({ name: '', username: '', password: '' })
+  const [form, setForm] = useState({ name: '', username: '', password: '', admin_secret: '' })
   const [showPass, setShowPass] = useState(false)
+  const [showSecret, setShowSecret] = useState(false)
+  const [showAdminField, setShowAdminField] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [registeredRole, setRegisteredRole] = useState('')
   const navigate = useNavigate()
   const strength = passwordStrength(form.password)
 
@@ -31,11 +41,18 @@ export default function Signup() {
     setLoading(true)
     setError('')
     try {
-      await api.post('/auth/register', form)
+      const payload = { name: form.name, username: form.username, password: form.password }
+      if (form.admin_secret) payload.admin_secret = form.admin_secret
+      const res = await api.post('/auth/register', payload)
+      setRegisteredRole(res.data.role)
       setSuccess(true)
       setTimeout(() => navigate('/login'), 2200)
     } catch (err) {
-      setError(err.response?.data?.detail || 'Registration failed. Please try again.')
+      if (!err.response) {
+        setError('Cannot connect to server. Make sure the backend is running.')
+      } else {
+        setError(err.response?.data?.detail || 'Registration failed. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
@@ -68,12 +85,15 @@ export default function Signup() {
                 <CheckCircle size={36} className="text-green-400" />
               </motion.div>
               <h3 className="text-xl font-bold text-white mb-2">Account Created!</h3>
-              <p className="text-gray-400 text-sm">Redirecting to login…</p>
+              <p className="text-gray-400 text-sm">
+                {registeredRole === 'admin' ? 'Admin account created successfully' : 'Staff account created successfully'}
+              </p>
+              <p className="text-gray-500 text-xs mt-1">Redirecting to login…</p>
             </motion.div>
           ) : (
             <motion.div key="form" className="glass-card p-7">
               <h2 className="text-2xl font-bold text-white mb-1">Create account</h2>
-              <p className="text-gray-500 text-sm mb-6">Join your team on CaféPOS as staff</p>
+              <p className="text-gray-500 text-sm mb-6">Join your team on CaféPOS</p>
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 <AnimatePresence>
@@ -87,21 +107,21 @@ export default function Signup() {
                 </AnimatePresence>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Full Name</label>
+                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{LABELS.fullName}</label>
                   <input type="text" value={form.name}
                     onChange={e => setForm({ ...form, name: e.target.value })}
                     className="input-field" placeholder="Your full name" required />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Username</label>
+                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{LABELS.username}</label>
                   <input type="text" value={form.username}
                     onChange={e => setForm({ ...form, username: e.target.value })}
                     className="input-field" placeholder="Choose a username" required />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Password</label>
+                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{LABELS.password}</label>
                   <div className="relative">
                     <input type={showPass ? 'text' : 'password'} value={form.password}
                       onChange={e => setForm({ ...form, password: e.target.value })}
@@ -124,6 +144,40 @@ export default function Signup() {
                   )}
                 </div>
 
+                {/* Admin secret toggle */}
+                <div>
+                  <button type="button" onClick={() => { setShowAdminField(!showAdminField); setForm({ ...form, admin_secret: '' }) }}
+                    className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors">
+                    <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all
+                      ${showAdminField ? 'bg-brand border-brand' : 'border-gray-600'}`}>
+                      {showAdminField && <span className="text-white text-[9px] font-black">✓</span>}
+                    </div>
+                    Register as Admin (requires secret key)
+                  </button>
+                </div>
+
+                <AnimatePresence>
+                  {showAdminField && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }}
+                      className="overflow-hidden">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{LABELS.adminSecretKey}</label>
+                        <div className="relative">
+                          <input type={showSecret ? 'text' : 'password'} value={form.admin_secret}
+                            onChange={e => setForm({ ...form, admin_secret: e.target.value })}
+                            className="input-field pr-11" placeholder="Enter admin secret key" />
+                          <button type="button" onClick={() => setShowSecret(!showSecret)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors">
+                            {showSecret ? <EyeOff size={15} /> : <Eye size={15} />}
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-600">Ask your system administrator for this key</p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 <motion.button type="submit" disabled={loading} whileTap={{ scale: 0.98 }}
                   className="btn-primary w-full py-3.5 flex items-center justify-center gap-2 mt-1">
                   {loading ? (
@@ -132,7 +186,7 @@ export default function Signup() {
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                     </svg>
                   ) : (
-                    <>Create Staff Account <ArrowRight size={16} /></>
+                    <>Create {form.admin_secret ? 'Admin' : 'Staff'} Account <ArrowRight size={16} /></>
                   )}
                 </motion.button>
               </form>

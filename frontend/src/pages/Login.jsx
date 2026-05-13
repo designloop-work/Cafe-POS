@@ -4,6 +4,11 @@ import { motion } from 'framer-motion'
 import { Eye, EyeOff, Coffee, ArrowRight, Zap, ShieldCheck, Users } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
+const LABELS = {
+  username: 'Username',
+  password: 'Password',
+}
+
 export default function Login() {
   const [form, setForm] = useState({ username: '', password: '' })
   const [showPass, setShowPass] = useState(false)
@@ -28,6 +33,8 @@ export default function Login() {
       const msg = err.response?.data?.detail
       if (msg === 'Invalid credentials') {
         setError('Username or password is incorrect.')
+      } else if (!err.response) {
+        setError('Cannot connect to server. Make sure the backend is running.')
       } else {
         setError('Something went wrong. Please try again.')
       }
@@ -109,8 +116,11 @@ export default function Login() {
             )}
 
             <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Username</label>
+              <label htmlFor="username" className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <span aria-label={LABELS.username}>{LABELS.username}</span>
+              </label>
               <input
+                id="username"
                 type="text"
                 value={form.username}
                 onChange={(e) => setForm({ ...form, username: e.target.value })}
@@ -123,9 +133,12 @@ export default function Login() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Password</label>
+              <label htmlFor="password" className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <span aria-label={LABELS.password}>{LABELS.password}</span>
+              </label>
               <div className="relative">
                 <input
+                  id="password"
                   type={showPass ? 'text' : 'password'}
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}

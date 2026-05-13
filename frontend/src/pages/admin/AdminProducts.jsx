@@ -10,6 +10,17 @@ import { formatCurrency } from '../../utils/helpers'
 
 const CATEGORIES = ['Coffee', 'Tea', 'Food', 'Snacks', 'Dessert', 'Drinks']
 const EMOJI = { Coffee: '☕', Tea: '🍵', Food: '🍽️', Snacks: '🍟', Dessert: '🍰', Drinks: '🥤' }
+const LABELS = {
+  name: 'Name',
+  category: 'Category',
+  price: 'Price (₹)',
+  available: 'Available on menu',
+  addProduct: 'Add Product',
+  editProduct: 'Edit Product',
+  cancel: 'Cancel',
+  add: 'Add',
+  update: 'Update',
+}
 
 const empty = { name: '', category: 'Coffee', price: '', is_available: true }
 
@@ -122,30 +133,30 @@ export default function AdminProducts() {
       )}
 
       {showModal && (
-        <Modal title={editing ? 'Edit Product' : 'Add Product'} onClose={() => setShowModal(false)}>
+        <Modal title={editing ? LABELS.editProduct : LABELS.addProduct} onClose={() => setShowModal(false)}>
           <form onSubmit={handleSave} className="space-y-4">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Name</label>
+              <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">{LABELS.name}</label>
               <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="input-field" placeholder="e.g. Espresso" required />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Category</label>
+              <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">{LABELS.category}</label>
               <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
                 className="input-field">
                 {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Price (₹)</label>
+              <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">{LABELS.price}</label>
               <input type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} className="input-field" placeholder="120" required min={0} step="0.01" />
             </div>
             <div className="flex items-center gap-3">
               <input type="checkbox" id="avail" checked={form.is_available} onChange={e => setForm({ ...form, is_available: e.target.checked })} className="w-4 h-4 accent-brand" />
-              <label htmlFor="avail" className="text-sm text-gray-300">Available on menu</label>
+              <label htmlFor="avail" className="text-sm text-gray-300">{LABELS.available}</label>
             </div>
             <div className="flex gap-2 pt-1">
-              <Button variant="secondary" type="button" onClick={() => setShowModal(false)} className="flex-1">Cancel</Button>
-              <Button type="submit" loading={saving} className="flex-1">{editing ? 'Update' : 'Add'}</Button>
+              <Button variant="secondary" type="button" onClick={() => setShowModal(false)} className="flex-1">{LABELS.cancel}</Button>
+              <Button type="submit" loading={saving} className="flex-1">{editing ? LABELS.update : LABELS.add}</Button>
             </div>
           </form>
         </Modal>

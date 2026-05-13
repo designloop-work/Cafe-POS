@@ -11,6 +11,11 @@ import { statusColor } from '../../utils/helpers'
 
 const MENU_BASE = `${window.location.origin}/menu`
 
+const LABELS = {
+  tableNumber: 'Table Number',
+  capacity: 'Capacity',
+}
+
 export default function AdminTables() {
   const [tables, setTables] = useState([])
   const [loading, setLoading] = useState(true)
@@ -163,12 +168,12 @@ export default function AdminTables() {
         <Modal title={editing ? 'Edit Table' : 'Add New Table'} onClose={() => setShowModal(false)}>
           <form onSubmit={handleSave} className="space-y-4">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Table Number</label>
+              <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">{LABELS.tableNumber}</label>
               <input type="number" value={form.number} onChange={e => setForm({ ...form, number: e.target.value })}
                 className="input-field" placeholder="e.g. 5" required min={1} disabled={!!editing} />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">Capacity</label>
+              <label className="text-xs font-medium text-gray-400 uppercase tracking-wider">{LABELS.capacity}</label>
               <input type="number" value={form.capacity} onChange={e => setForm({ ...form, capacity: e.target.value })}
                 className="input-field" min={1} />
             </div>

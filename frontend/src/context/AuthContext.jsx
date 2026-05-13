@@ -18,7 +18,6 @@ export function AuthProvider({ children }) {
     localStorage.setItem('token', data.access_token)
     localStorage.setItem('user', JSON.stringify(data.user))
     setUser(data.user)
-    // Return user so caller can route based on role from DB
     return data.user
   }
 
